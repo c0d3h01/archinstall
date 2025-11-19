@@ -238,6 +238,7 @@ function install_base_system() {
         mise
 
         # -*- Development-tool -*-
+        sops
         rustup
         lld
         mold
@@ -250,13 +251,16 @@ function install_base_system() {
         nodejs
         bun
         yarn
+        postgresql
+        mariadb-lts
+        mysql-workbench
         docker
         docker-compose
+        docker-buildx
+        lazydocker
         jdk17-openjdk
         jupyterlab
-        python
-        python-virtualenv
-        python-pip
+        pyenv
         zig
         go
         php
