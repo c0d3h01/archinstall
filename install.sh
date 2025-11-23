@@ -269,7 +269,7 @@ function install_base_system() {
         lld
         mold
         gcc
-        glib
+        glibc
         gdb
         make
         cmake
