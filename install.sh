@@ -57,25 +57,16 @@ function init_config() {
     done
 
     # --- Locale: safe default + optional override ---
-    locale="en_IN.UTF-8"
-    echo "Available UTF-8 locales:"
-    locale -a 2>/dev/null | grep -E '^[a-z][a-z]_[A-Z]{2}\.UTF-8$' | head -n 8 | nl
-    echo "Default: $locale"
-    read -rp "Press Enter to keep default, or type a locale: " user_locale
-    [ -n "$user_locale" ] && locale="$user_locale"
+    locale_default="en_IN.UTF-8"
+    read -rp "Locale [$locale_default]: " user_locale
+    locale="${user_locale:-$locale_default}"
     echo "Using locale: $locale"
 
     # --- Timezone selection ---
-    timezone="Asia/Kolkata"
-    echo -e "${BLUE}Common timezones:${NC}"
-    {
-        echo "Asia/Kolkata"
-        echo "UTC"
-        timedatectl list-timezones 2>/dev/null | grep -E '^(Asia|Europe|America)/' | head -n 12
-    } | nl
-    echo -e "  (Default: ${GREEN}${timezone}${NC})"
-    read -rp "Press Enter to keep default, or type timezone (e.g. Europe/London): " user_tz
-    [[ -n "$user_tz" ]] && timezone="$user_tz"
+    timezone_default="Asia/Kolkata"
+    read -rp "Timezone [$timezone_default]: " user_tz
+    timezone="${user_tz:-$timezone_default}"
+    echo "Using timezone: $timezone"
 
     CONFIG=(
         [DRIVE]="$drive"
