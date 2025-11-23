@@ -338,7 +338,7 @@ HOSTS
     echo "root:${CONFIG[PASSWORD]}" | chpasswd
 
     # Create new user account
-    useradd -m -G wheel,video,audio,storage,lp -s /bin/bash "${CONFIG[USERNAME]}"
+    useradd -m -G wheel,video,audio,sys,rfkill,storage,lp -s /bin/bash "${CONFIG[USERNAME]}"
 
     # Set user password
     echo "${CONFIG[USERNAME]}:${CONFIG[PASSWORD]}" | chpasswd
