@@ -17,29 +17,70 @@ declare -A CONFIG
 
 # -*- Configuration function -*-
 function init_config() {
+    local drive hostname username password confirm_password locale
 
+    # --- Disk selection ---
+    echo -e "${BLUE}Available disks:${NC}"
+    lsblk -dpno NAME,SIZE,MODEL | grep -E '^/dev/(sd|hd|vd|nvme)' || { echo "No disks found."; exit 1; }
+    echo
+    while [[ -z "$drive" ]]; do
+        read -rp "Enter disk device (e.g. /dev/nvme0n1): " drive
+        [[ -b "$drive" ]] && break
+        echo "!Invalid or non-existent block device: $drive"
+        drive=""
+    done
+
+    # --- Hostname & username ---
+    while [[ -z "$hostname" ]]; do
+        read -rp "Enter hostname: " hostname
+    done
+    while [[ -z "$username" ]]; do
+        read -rp "Enter username: " username
+    done
+
+    # --- Password confirmation ---
     while true; do
-        read -s -p "Enter a single password for root and user: " PASSWORD
+        read -rsp "Enter password for root and user: " password
         echo
-        read -s -p "Confirm the password: " CONFIRM_PASSWORD
+        read -rsp "Confirm password: " confirm_password
         echo
-        if [ "$PASSWORD" = "$CONFIRM_PASSWORD" ]; then
+        if [[ "$password" == "$confirm_password" && -n "$password" ]]; then
             break
         else
-            echo "Passwords do not match. Try again."
+            echo "!Passwords do not match or are empty. Try again."
         fi
     done
 
+    # --- Locale: safe default + optional override ---
+    locale="en_IN.UTF-8"
+    echo -e "${BLUE}Detected common UTF-8 locales:${NC}"
+    locale -a 2>/dev/null | grep -E '^[a-z][a-z]_[A-Z]{2}\.UTF-8$' | head -n 8 | nl
+    echo -e "  (Default: ${GREEN}${locale}${NC})"
+    read -rp "Press Enter to keep default, or type locale (e.g. en_US.UTF-8): " user_locale
+    [[ -n "$user_locale" ]] && locale="$user_locale"
+
+    # --- Timezone selection ---
+    timezone="Asia/Kolkata"
+    echo -e "${BLUE}Common timezones:${NC}"
+    {
+        echo "Asia/Kolkata"
+        echo "UTC"
+        timedatectl list-timezones 2>/dev/null | grep -E '^(Asia|Europe|America)/' | head -n 12
+    } | nl
+    echo -e "  (Default: ${GREEN}${timezone}${NC})"
+    read -rp "Press Enter to keep default, or type timezone (e.g. Europe/London): " user_tz
+    [[ -n "$user_tz" ]] && timezone="$user_tz"
+
     CONFIG=(
-        [DRIVE]="/dev/nvme0n1"
-        [HOSTNAME]="eva"
-        [USERNAME]="c0d3h01"
-        [PASSWORD]="$PASSWORD"
-        [TIMEZONE]="Asia/Kolkata"
-        [LOCALE]="en_IN.UTF-8"
+        [DRIVE]="$drive"
+        [HOSTNAME]="$hostname"
+        [USERNAME]="$username"
+        [PASSWORD]="$password"
+        [TIMEZONE]="$timezone"
+        [LOCALE]="$locale"
+        [EFI_PART]="$drive"p1
+        [ROOT_PART]="$drive"p2
     )
-    CONFIG[EFI_PART]="${CONFIG[DRIVE]}p1"
-    CONFIG[ROOT_PART]="${CONFIG[DRIVE]}p2"
 }
 
 # -*- Logging functions -*-
@@ -62,8 +103,6 @@ function setup_disk() {
 
     # -*- Reload the partition table -*-
     partprobe "${CONFIG[DRIVE]}"
-
-    sleep 2  # Wait for partition table to be recognized
 }
 
 function setup_filesystems() {
@@ -109,7 +148,7 @@ function install_base_system() {
     pacman -Syy
 
     info "Running reflctor..."
-    reflector --country India --age 7 --protocol https --sort rate --save "/etc/pacman.d/mirrorlist"
+    reflector --latest 10 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
 
     local base_packages=(
         # -*- Core System -*-
@@ -117,7 +156,6 @@ function install_base_system() {
         base-devel        # Basic tools to build Arch Linux packages
         linux-firmware    # Firmware files for Linux
         linux-lts         # The LTS Linux kernel and modules
-        linux-lts-headers # Headers and scripts for building modules for the LTS Linux kernel
 
         # -*- Filesystem -*-
         btrfs-progs # Btrfs filesystem utilities
@@ -214,7 +252,7 @@ function install_base_system() {
         reflector
         pacutils
         fastfetch
-        glances
+        htop
         wget
         curl
         sshpass
@@ -225,17 +263,8 @@ function install_base_system() {
         snap-pac
         grub-btrfs
         xclip
-        zsh
-        neovim
-        starship
-        bat
-        lsd
-        fd
-        repigrep
-        zoxide
+        vim
         tmux
-        fzf
-        mise
 
         # -*- Development-tool -*-
         sops
@@ -245,12 +274,10 @@ function install_base_system() {
         gcc
         glib
         gdb
+        make
         cmake
         clang
-        npm
-        nodejs
-        bun
-        yarn
+        nvm
         postgresql
         mariadb-lts
         mysql-workbench
@@ -259,20 +286,15 @@ function install_base_system() {
         docker-buildx
         lazydocker
         jdk17-openjdk
-        jupyterlab
         pyenv
         zig
         go
         php
-        composer
-        php-imagick
-        php-sqlite
 
         # -*- User Utilities -*-
         chromium
         discord
         qbittorrent
-        telegram-desktop
     )
     pacstrap -K /mnt --needed "${base_packages[@]}"
 }
@@ -310,17 +332,16 @@ function configure_system() {
     # Configure hosts file for network resolution
     # Sets localhost and system-specific hostname mappings
     cat > "/etc/hosts" << HOSTS
-# Standard localhost entries
-127.0.0.1 localhost
-::1 localhost
-127.0.0.2 ${CONFIG[HOSTNAME]}
+127.0.0.1   localhost
+::1         localhost
+127.0.1.1   ${CONFIG[HOSTNAME]}.localdomain ${CONFIG[HOSTNAME]}
 HOSTS
 
     # Set root password using chpasswd (securely)
     echo "root:${CONFIG[PASSWORD]}" | chpasswd
 
     # Create new user account
-    useradd -m -G wheel -s /bin/bash ${CONFIG[USERNAME]}
+    useradd -m -G wheel,video,audio,storage,lp -s /bin/bash "${CONFIG[USERNAME]}"
 
     # Set user password
     echo "${CONFIG[USERNAME]}:${CONFIG[PASSWORD]}" | chpasswd
@@ -334,19 +355,27 @@ HOSTS
     # -*- Generate GRUB configuration file -*-
     grub-mkconfig -o /boot/grub/grub.cfg
 
+    # Ensure microcode in initramfs
+    if ! grep -q '^HOOKS.*microcode' /etc/mkinitcpio.conf; then
+        sed -i "s/HOOKS=(/HOOKS=(microcode /" /etc/mkinitcpio.conf
+    fi
+
     # -*- Regenerate initramfs for all kernels -*-
     mkinitcpio -P
+
+    info "Running reflctor..."
+    reflector --latest 10 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
 EOF
 }
 
-function coustom_configuration() {
+function custom_configuration() {
     arch-chroot /mnt /bin/bash <<EOF
     # -*- Create zram configuration file for systemd zram generator -*-
     cat > "/usr/lib/systemd/zram-generator.conf" << ZRAM
 [zram0]
 compression-algorithm = zstd
-zram-size = ram * 2
-swap-priority = 1000
+zram-size = ram
+swap-priority = 100
 fs-type = swap
 ZRAM
 
@@ -355,9 +384,6 @@ ZRAM
     sed -i 's/^#Color/Color/' "/etc/pacman.conf"
     sed -i '/^# Misc options/a DisableDownloadTimeout\nILoveCandy' "/etc/pacman.conf"
     sed -i '/#\[multilib\]/,/#Include = \/etc\/pacman.d\/mirrorlist/ s/^#//' "/etc/pacman.conf"
-
-    # -*- Set zsh as default shell for the user -*-
-    chsh -s /bin/zsh ${CONFIG[USERNAME]}
 
     # -*- Enable additional services -*-
     systemctl enable \
@@ -368,11 +394,22 @@ ZRAM
     dbus \
     lm_sensors \
     avahi-daemon \
-    docker \
+    docker.socket \
+    sshd \
+    cups.socket \
+    systemd-homed \
     systemd-timesyncd \
     snapper-timeline.timer snapper-cleanup.timer
 
     systemctl --user enable pipewire wireplumber
+
+    # Modern DNS
+    systemctl enable systemd-resolved
+    ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+
+    # Ensure PipeWire replaces PulseAudio system-wide
+    ln -sf /usr/share/alsa/alsa.conf.d/99-pipewire-default.conf /etc/alsa/conf.d/
+    systemctl --global enable pipewire pipewire-pulse wireplumber
 EOF
 }
 
@@ -386,12 +423,13 @@ function main() {
     setup_filesystems
     install_base_system
     configure_system
-    coustom_configuration
+    custom_configuration
 
     read -p "Installation successful!, Unmount NOW? (y/n): " UNMOUNT
     if [[ $UNMOUNT =~ ^[Yy]$ ]]; then
         umount -R /mnt
-    else { arch-chroot /mnt }
+    else
+        arch-chroot /mnt
     fi
 }
 
