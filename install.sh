@@ -17,7 +17,12 @@ declare -A CONFIG
 
 # -*- Configuration function -*-
 function init_config() {
-    local drive hostname username password confirm_password locale
+    local drive=""
+    local hostname=""
+    local username=""
+    local password=""
+    local confirm_password=""
+    local locale=""
 
     # --- Disk selection ---
     echo -e "${BLUE}Available disks:${NC}"
