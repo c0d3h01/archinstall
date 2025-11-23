@@ -58,11 +58,12 @@ function init_config() {
 
     # --- Locale: safe default + optional override ---
     locale="en_IN.UTF-8"
-    echo -e "${BLUE}Detected common UTF-8 locales:${NC}"
+    echo "Available UTF-8 locales:"
     locale -a 2>/dev/null | grep -E '^[a-z][a-z]_[A-Z]{2}\.UTF-8$' | head -n 8 | nl
-    echo -e "  (Default: ${GREEN}${locale}${NC})"
-    read -rp "Press Enter to keep default, or type locale (e.g. en_US.UTF-8): " user_locale
-    [[ -n "$user_locale" ]] && locale="$user_locale"
+    echo "Default: $locale"
+    read -rp "Press Enter to keep default, or type a locale: " user_locale
+    [ -n "$user_locale" ] && locale="$user_locale"
+    echo "Using locale: $locale"
 
     # --- Timezone selection ---
     timezone="Asia/Kolkata"
