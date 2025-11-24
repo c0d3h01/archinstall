@@ -413,6 +413,10 @@ EOF
 function main() {
     info "Starting Arch Linux installation script..."
 
+    # Resize fonts while installations
+    setfont latarcyrheb-sun32
+    setfont ter-132n
+
     init_config
 
     # Main installation steps
