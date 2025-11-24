@@ -145,7 +145,7 @@ function install_base_system() {
     pacman -Syy
 
     info "Running reflctor..."
-    reflector --country India --age 7 --protocol https -- sort rate --save "/etc/pacman.d/mirrorlist"
+    reflector --country India --age 7 --protocol https --sort rate --save "/etc/pacman.d/mirrorlist"
 
     local base_packages=(
         # -*- Core System -*-
