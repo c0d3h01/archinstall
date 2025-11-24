@@ -53,12 +53,6 @@ systemctl enable \
   systemd-resolved systemd-timesyncd fstrim.timer \
   snapper-timeline.timer snapper-cleanup.timer firewalld
 
-# Configure systemd-resolved
-ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
-
-# Enable mDNS resolution
-sed -i 's/^hosts:.*/hosts: mymachines mdns_minimal [NOTFOUND=return] resolve [!UNAVAIL=return] files myhostname dns/' /etc/nsswitch.conf
-
 # --- Pacman config ---
 echo "→ Configuring pacman"
 sed -i \
@@ -70,11 +64,6 @@ sed -i \
 
 # Enable multilib Include line (handles both commented states)
 sed -i '/^\[multilib\]/,/^Include/ s/^#Include/Include/' /etc/pacman.conf
-
-# --- PipeWire configuration ---
-echo "→ Configuring PipeWire"
-mkdir -p /etc/alsa/conf.d
-ln -sf /usr/share/alsa/alsa.conf.d/99-pipewire-default.conf /etc/alsa/conf.d/
 
 # --- Zram configuration ---
 echo "→ Configuring zram"
